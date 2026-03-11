@@ -502,15 +502,29 @@ scan_common_locations() {
         locations+=("/tmp/openclaw"* "/tmp/.openclaw"*)
     fi
 
+    # 保存当前的 shell 选项并设置安全的 glob 选项
+    local old_opts=$(set +o)
+    set -f  # 禁用通配符展开（ noglob ）
+
     # 检查每个位置，将结果添加到全局变量
     for loc in "${locations[@]}"; do
-        # 处理通配符展开
-        for expanded in $loc; do
+        # 使用 eval 安全地展开通配符，然后重新启用通配符
+        set +f  # 重新启用通配符展开
+        local expanded_files=()
+        # 使用数组安全地捕获展开的文件
+        eval "expanded_files=($loc)"
+        set -f  # 再次禁用通配符展开
+
+        # 检查每个展开的文件
+        for expanded in "${expanded_files[@]}"; do
             if [ -e "$expanded" ]; then
                 SCAN_RESULT+=("$expanded")
             fi
         done
     done
+
+    # 恢复原来的 shell 选项
+    eval "$old_opts"
 }
 
 # 主函数
