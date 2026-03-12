@@ -1,6 +1,3 @@
-# OpenClaw Uninstaller for Windows - 一键卸载工具
-# 让这只龙虾体面告别
-
 #Requires -Version 5.1
 
 # 错误处理设置
@@ -33,7 +30,7 @@ function Show-Banner {
     Write-Host "╔════════════════════════════════════════════════════════════════╗" -ForegroundColor White
     Write-Host "║                                                                ║" -ForegroundColor White
     Write-Host "║          OpenClaw 一键卸载器 v1.0 (Windows)                    ║" -ForegroundColor White
-    Write-Host "║          让这只龙虾体面告别 🦞                                 ║" -ForegroundColor White
+    Write-Host "║          体面告别 OpenClaw                                      ║" -ForegroundColor White
     Write-Host "║                                                                ║" -ForegroundColor White
     Write-Host "╚════════════════════════════════════════════════════════════════╝" -ForegroundColor White
     Write-Host ""
@@ -82,7 +79,7 @@ function Get-DirSize {
         $size = (Get-ChildItem -Path $Path -Recurse -ErrorAction SilentlyContinue |
                  Measure-Object -Property Length -Sum).Sum
 
-        if ($size) {
+        if ($size -and $size -gt 0) {
             return Format-FileSize $size
         }
         return "未知"
@@ -131,24 +128,24 @@ function Test-ServiceRunning {
 function Get-CLIInstallMethod {
     # 检查 npm
     if (Get-Command npm -ErrorAction SilentlyContinue) {
-        $npmList = npm list -g openclaw 2>$null
-        if ($LASTEXITCODE -eq 0) {
+        $npmList = npm list -g openclaw 2>$null | Out-String
+        if ($npmList -match 'openclaw@') {
             return "npm"
         }
     }
 
     # 检查 pnpm
     if (Get-Command pnpm -ErrorAction SilentlyContinue) {
-        $pnpmList = pnpm list -g openclaw 2>$null
-        if ($LASTEXITCODE -eq 0) {
+        $pnpmList = pnpm list -g openclaw 2>$null | Out-String
+        if ($pnpmList -match 'openclaw@') {
             return "pnpm"
         }
     }
 
     # 检查 bun
     if (Get-Command bun -ErrorAction SilentlyContinue) {
-        $bunList = bun pm ls -g openclaw 2>$null
-        if ($LASTEXITCODE -eq 0) {
+        $bunList = bun pm ls -g openclaw 2>$null | Out-String
+        if ($bunList -match 'openclaw@') {
             return "bun"
         }
     }
@@ -170,7 +167,7 @@ function Show-DetectionSummary {
     Write-Host ""
 
     # 状态目录
-    Write-Host "📦 状态目录：" -ForegroundColor Cyan
+    Write-Host "[状态目录]" -ForegroundColor Cyan
     $stateDirs = Find-AllStateDirs
 
     if ($stateDirs.Count -eq 0) {
@@ -179,18 +176,18 @@ function Show-DetectionSummary {
     else {
         foreach ($dir in $stateDirs) {
             $size = Get-DirSize $dir
-            Write-Host "   ✓" -NoNewline -ForegroundColor Green
+            Write-Host "   [√]" -NoNewline -ForegroundColor Green
             Write-Host " $dir ($size)"
         }
     }
     Write-Host ""
 
     # 工作空间
-    Write-Host "🗑️  工作空间：" -ForegroundColor Cyan
+    Write-Host "[工作空间]" -ForegroundColor Cyan
     $workspacePath = Join-Path $env:USERPROFILE ".openclaw\workspace"
     if (Test-Path $workspacePath) {
         $size = Get-DirSize $workspacePath
-        Write-Host "   ✓" -NoNewline -ForegroundColor Green
+        Write-Host "   [√]" -NoNewline -ForegroundColor Green
         Write-Host " $workspacePath ($size)"
     }
     else {
@@ -199,9 +196,9 @@ function Show-DetectionSummary {
     Write-Host ""
 
     # 系统服务
-    Write-Host "🔧 系统服务：" -ForegroundColor Cyan
+    Write-Host "[系统服务]" -ForegroundColor Cyan
     if ($ServiceRunning) {
-        Write-Host "   ✓" -NoNewline -ForegroundColor Green
+        Write-Host "   [√]" -NoNewline -ForegroundColor Green
         Write-Host " openclaw-gateway (运行中)"
     }
     else {
@@ -210,14 +207,14 @@ function Show-DetectionSummary {
     Write-Host ""
 
     # CLI 安装
-    Write-Host "💻 CLI 安装：" -ForegroundColor Cyan
+    Write-Host "[CLI 安装]" -ForegroundColor Cyan
     if ($CLIAvailable) {
         if ($CLIMethod -ne "unknown") {
-            Write-Host "   ✓" -NoNewline -ForegroundColor Green
+            Write-Host "   [√]" -NoNewline -ForegroundColor Green
             Write-Host " $CLIMethod 全局安装"
         }
         else {
-            Write-Host "   ✓" -NoNewline -ForegroundColor Green
+            Write-Host "   [√]" -NoNewline -ForegroundColor Green
             Write-Host " CLI 可用（安装方式未知）"
         }
     }
@@ -359,14 +356,14 @@ function Uninstall-CLI {
 function Show-CleanupSummary {
     param(
         [int]$StateDirsCount,
-        [int]$WorkspaceRemoved,
-        [int]$CLIRemoved,
-        [int]$ServiceRemoved
+        [int]$WorkspaceSuccess,
+        [int]$CLISuccess,
+        [int]$ServiceSuccess
     )
 
     Write-Host ""
     Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor White
-    Write-Host "✅ OpenClaw 已成功卸载！" -ForegroundColor Green
+    Write-Host "[OK] OpenClaw 已成功卸载！" -ForegroundColor Green
     Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor White
     Write-Host ""
     Write-Host "已清理："
@@ -374,18 +371,18 @@ function Show-CleanupSummary {
     if ($StateDirsCount -gt 0) {
         Write-Host "• $StateDirsCount 个状态目录"
     }
-    if ($WorkspaceRemoved -eq 0) {
+    if ($WorkspaceSuccess -eq 0) {
         Write-Host "• 工作空间"
     }
-    if ($ServiceRemoved -eq 0) {
+    if ($ServiceSuccess -eq 0) {
         Write-Host "• 系统服务"
     }
-    if ($CLIRemoved -eq 0) {
+    if ($CLISuccess -eq 0) {
         Write-Host "• CLI 本体"
     }
 
     Write-Host ""
-    Write-Host "🦞 龙虾已经体面告别。" -ForegroundColor White
+    Write-Host "OpenClaw 已经体面告别。" -ForegroundColor White
     Write-Host "═══════════════════════════════════════════════════════════════" -ForegroundColor White
     Write-Host ""
 }
@@ -395,13 +392,14 @@ function Scan-AndCleanupRemainingFiles {
     Print-Step "扫描系统中残留的 openclaw 文件..."
 
     $remainingFiles = @()
+    $hasGlobalConfig = $false
 
-    # 扫描常见位置
+    # 扫描常见位置（统一在一个地方定义）
     $locations = @(
-        (Join-Path $env:USERPROFILE ".openclawrc"),
-        (Join-Path $env:USERPROFILE ".openclaw.config"),
-        (Join-Path $env:APPDATA "openclaw"),
-        (Join-Path $env:LOCALAPPDATA "openclaw")
+        @{Path = (Join-Path $env:USERPROFILE ".openclawrc"); IsGlobalConfig = $true},
+        @{Path = (Join-Path $env:USERPROFILE ".openclaw.config"); IsGlobalConfig = $true},
+        @{Path = (Join-Path $env:APPDATA "openclaw"); IsGlobalConfig = $false},
+        @{Path = (Join-Path $env:LOCALAPPDATA "openclaw"); IsGlobalConfig = $false}
     )
 
     # 临时文件
@@ -409,13 +407,19 @@ function Scan-AndCleanupRemainingFiles {
     if ($tempPath) {
         $tempOpenclaw = Get-ChildItem -Path $tempPath -Filter "openclaw*" -ErrorAction SilentlyContinue
         if ($tempOpenclaw) {
-            $locations += $tempOpenclaw.FullName
+            foreach ($item in $tempOpenclaw) {
+                $locations += @{Path = $item.FullName; IsGlobalConfig = $false}
+            }
         }
     }
 
     foreach ($loc in $locations) {
-        if (Test-Path $loc) {
-            $remainingFiles += $loc
+        $path = $loc.Path
+        if (Test-Path $path) {
+            $remainingFiles += $path
+            if ($loc.IsGlobalConfig) {
+                $hasGlobalConfig = $true
+            }
         }
     }
 
@@ -429,21 +433,27 @@ function Scan-AndCleanupRemainingFiles {
     Write-Host "发现 $($remainingFiles.Count) 个残留文件/目录：" -ForegroundColor Yellow
     Write-Host ""
 
+    # 如果有全局配置文件，显示警告
+    if ($hasGlobalConfig) {
+        Write-Host "[!] 警告：检测到全局配置文件，删除可能影响其他系统或项目" -ForegroundColor Yellow
+        Write-Host ""
+    }
+
     foreach ($file in $remainingFiles) {
         if (Test-Path $file -PathType Container) {
             $size = Get-DirSize $file
-            Write-Host "   📁" -NoNewline -ForegroundColor Cyan
+            Write-Host "   [DIR]" -NoNewline -ForegroundColor Cyan
             Write-Host " $file ($size)"
         }
         else {
             $size = (Get-Item $file -ErrorAction SilentlyContinue).Length
             if ($size) {
                 $formattedSize = Format-FileSize $size
-                Write-Host "   📄" -NoNewline -ForegroundColor Cyan
+                Write-Host "   [FILE]" -NoNewline -ForegroundColor Cyan
                 Write-Host " $file ($formattedSize)"
             }
             else {
-                Write-Host "   📄" -NoNewline -ForegroundColor Cyan
+                Write-Host "   [FILE]" -NoNewline -ForegroundColor Cyan
                 Write-Host " $file"
             }
         }
@@ -462,11 +472,11 @@ function Scan-AndCleanupRemainingFiles {
     # 执行删除
     $deletedCount = 0
     foreach ($file in $remainingFiles) {
-        try {
-            Remove-Item -Path $file -Recurse -Force -ErrorAction Stop
+        Remove-Item -Path $file -Recurse -Force -ErrorAction SilentlyContinue
+        if ($?) {
             $deletedCount++
         }
-        catch {
+        else {
             Print-Warning "无法删除 $file"
         }
     }
@@ -480,9 +490,17 @@ function Scan-AndCleanupRemainingFiles {
 
     if ($response -match '^[Yy]$') {
         $scriptPath = $PSCommandPath
-        if (Test-Path $scriptPath) {
-            Remove-Item -Path $scriptPath -Force -ErrorAction SilentlyContinue
-            Print-Success "脚本已自删除"
+        if ($scriptPath -and (Test-Path $scriptPath)) {
+            try {
+                Remove-Item -Path $scriptPath -Force
+                Print-Success "脚本已自删除"
+            }
+            catch {
+                Print-Warning "无法删除脚本：$_"
+            }
+        }
+        else {
+            Print-Warning "脚本路径无效或不存在"
         }
     }
 }
@@ -548,7 +566,7 @@ function Main {
     Write-Host ""
 
     # 显示完成信息
-    Show-CleanupSummary -StateDirsCount $stateDirsCount -WorkspaceRemoved $workspaceRemoved -CLIRemoved $cliRemoved -ServiceRemoved $serviceRemoved
+    Show-CleanupSummary -StateDirsCount $stateDirsCount -WorkspaceSuccess $workspaceRemoved -CLISuccess $cliRemoved -ServiceSuccess $serviceRemoved
 
     # 扫描并清理残留文件
     Scan-AndCleanupRemainingFiles
